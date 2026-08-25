@@ -1,0 +1,19 @@
+{
+  "name": "font-metrics-kit",
+  "version": "0.1.0",
+  "description": "Measure text using real font metrics tables instead of string length.",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test dist/test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
