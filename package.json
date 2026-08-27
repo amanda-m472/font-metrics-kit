@@ -5,6 +5,16 @@
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./sfnt": {
+      "types": "./dist/src/sfnt.d.ts",
+      "default": "./dist/src/sfnt.js"
+    }
+  },
   "files": [
     "dist/src"
   ],

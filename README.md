@@ -55,11 +55,32 @@ measureWidth(metrics, "Hello", 16) // rendered width in pixels at 16px
 lineHeight(metrics, 16) // single-line height in pixels at 16px
 ```
 
+### Loading metrics from a font file
+
+`parseSfntMetrics` reads the `head`, `hhea`, `maxp`, `hmtx`, `cmap`, and (if
+present) legacy `kern` tables straight out of a TTF or OTF binary, so you
+don't have to build a `FontMetricsInit` by hand:
+
+```ts
+import { parseSfntMetrics } from "font-metrics-kit/sfnt"
+import { readFile } from "node:fs/promises"
+
+const bytes = await readFile("./Inter-Regular.ttf")
+const metrics = parseSfntMetrics(bytes)
+measureWidth(metrics, "Hello", 16)
+```
+
+Font collections (`.ttc`/`.otc`) aren't supported — pass the bytes of a
+single font. Kerning is read from the legacy `kern` table only; fonts that
+kern exclusively through GPOS pair adjustment (most modern ones) will
+measure without kerning.
+
 ## Status
 
-Early skeleton: advance widths, kerning pairs, and vertical metrics work.
-There is no font file parser yet — see the roadmap in the repo for what's
-planned next.
+Advance widths, kerning pairs, vertical metrics, and parsing real hmtx/hhea/
+cmap/kern tables out of TTF/OTF binaries all work. There is no word-wrap or
+line-breaking yet, no AFM support, and no vertical writing mode — see the
+roadmap in the repo for what's planned next.
 
 ## License
 
