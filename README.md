@@ -75,12 +75,29 @@ single font. Kerning is read from the legacy `kern` table only; fonts that
 kern exclusively through GPOS pair adjustment (most modern ones) will
 measure without kerning.
 
+### Word wrap
+
+`wrapText` breaks a string into lines that fit a pixel width, using
+`measureWidth` under the hood so it accounts for kerning and zero-width
+characters the same way single-line measurement does:
+
+```ts
+import { wrapText } from "font-metrics-kit/wrap"
+
+wrapText(metrics, "the quick brown fox", 16, 120)
+// [{ text: "the quick", width: ... }, { text: "brown fox", width: ... }, ...]
+```
+
+Lines break at whitespace. A single word wider than the given width on its
+own is force-broken at code point boundaries, since there's nowhere better
+to put it. `\n`, `\r\n`, and `\r` are all treated as explicit line breaks.
+
 ## Status
 
-Advance widths, kerning pairs, vertical metrics, and parsing real hmtx/hhea/
-cmap/kern tables out of TTF/OTF binaries all work. There is no word-wrap or
-line-breaking yet, no AFM support, and no vertical writing mode — see the
-roadmap in the repo for what's planned next.
+Advance widths, kerning pairs, vertical metrics, parsing real hmtx/hhea/
+cmap/kern tables out of TTF/OTF binaries, and greedy word-wrap all work.
+There is no vertical writing mode yet and no AFM support — see the roadmap
+in the repo for what's planned next.
 
 ## License
 

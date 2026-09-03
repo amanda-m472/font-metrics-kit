@@ -13,6 +13,10 @@
     "./sfnt": {
       "types": "./dist/src/sfnt.d.ts",
       "default": "./dist/src/sfnt.js"
+    },
+    "./wrap": {
+      "types": "./dist/src/wrap.d.ts",
+      "default": "./dist/src/wrap.js"
     }
   },
   "files": [
