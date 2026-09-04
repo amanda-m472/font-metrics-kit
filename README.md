@@ -55,6 +55,40 @@ measureWidth(metrics, "Hello", 16) // rendered width in pixels at 16px
 lineHeight(metrics, 16) // single-line height in pixels at 16px
 ```
 
+### Vertical writing mode
+
+Some scripts (traditionally Japanese, Chinese, Mongolian) set text with
+glyphs advancing top-to-bottom instead of left-to-right. Supply
+`vertAdvances`, `vertAscent`, `vertDescent`, and `vertLineGap` alongside the
+horizontal metrics — these mirror a font's `vhea`/`vmtx` tables the same way
+`advances` and `ascent`/`descent`/`lineGap` mirror `hhea`/`hmtx`:
+
+```ts
+const metrics = createFontMetrics({
+  unitsPerEm: 1000,
+  ascent: 880,
+  descent: -120,
+  defaultAdvance: 1000,
+  advances: [],
+  vertAscent: 500,
+  vertDescent: -500,
+  vertLineGap: 0,
+  defaultVertAdvance: 1000,
+  vertAdvances: [["田".codePointAt(0)!, 1000]],
+})
+
+measureHeight(metrics, "田田", 16) // rendered height of a vertical run
+verticalLineWidth(metrics, 16) // spacing between adjacent vertical lines
+```
+
+If a font has no vertical-specific metrics at all — most Latin text faces,
+and any AFM file, which has no vertical metrics format — `createFontMetrics`
+falls back to the horizontal `ascent`/`descent`/`lineGap` for line spacing
+and to `unitsPerEm` (a full em) for `defaultVertAdvance`, so `measureHeight`
+and `verticalLineWidth` still return sensible values. There is no vertical
+counterpart to kerning: vertical kerning (`vkrn`) is rare enough in practice
+to be out of scope here, same as GPOS kerning is for horizontal measurement.
+
 ### Loading metrics from a font file
 
 `parseSfntMetrics` reads the `head`, `hhea`, `maxp`, `hmtx`, `cmap`, and (if
@@ -94,10 +128,12 @@ to put it. `\n`, `\r\n`, and `\r` are all treated as explicit line breaks.
 
 ## Status
 
-Advance widths, kerning pairs, vertical metrics, parsing real hmtx/hhea/
-cmap/kern tables out of TTF/OTF binaries, and greedy word-wrap all work.
-There is no vertical writing mode yet and no AFM support — see the roadmap
-in the repo for what's planned next.
+Advance widths, kerning pairs, line-height metrics, vertical writing mode,
+parsing real hmtx/hhea/cmap/kern tables out of TTF/OTF binaries, and greedy
+word-wrap all work. Vertical metrics are supplied by the caller, the same
+way horizontal ones are — `parseSfntMetrics` does not read `vhea`/`vmtx`
+yet. There is no AFM support yet either — see the roadmap in the repo for
+what's planned next.
 
 ## License
 

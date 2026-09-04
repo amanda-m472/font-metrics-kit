@@ -1,6 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { createFontMetrics, measureAdvance, measureWidth, lineHeight } from "../src/index.js"
+import {
+  createFontMetrics,
+  measureAdvance,
+  measureWidth,
+  lineHeight,
+  measureVerticalAdvance,
+  measureHeight,
+  verticalLineWidth,
+} from "../src/index.js"
 
 // A small fictional font, unitsPerEm 1000, loosely shaped like a sans-serif
 // text face. Just enough glyphs to exercise the cases below.
@@ -71,4 +79,65 @@ test("lineHeight follows the ascent - descent + lineGap convention", () => {
   const fontSize = 16
   const expected = ((800 - -200 + 0) / metrics.unitsPerEm) * fontSize
   assert.strictEqual(lineHeight(metrics, fontSize), expected)
+})
+
+test("a font with no vertical metrics falls back to horizontal ascent/descent/lineGap and unitsPerEm", () => {
+  assert.strictEqual(metrics.vertAscent, metrics.ascent)
+  assert.strictEqual(metrics.vertDescent, metrics.descent)
+  assert.strictEqual(metrics.vertLineGap, metrics.lineGap)
+  assert.strictEqual(metrics.defaultVertAdvance, metrics.unitsPerEm)
+})
+
+const verticalMetrics = createFontMetrics({
+  unitsPerEm: 1000,
+  ascent: 800,
+  descent: -200,
+  defaultAdvance: 600,
+  advances: [],
+  vertAscent: 500,
+  vertDescent: -500,
+  vertLineGap: 100,
+  defaultVertAdvance: 1000,
+  vertAdvances: [
+    ["H".codePointAt(0)!, 880],
+    ["e".codePointAt(0)!, 880],
+  ],
+})
+
+test("measureVerticalAdvance sums known vertical advances", () => {
+  assert.strictEqual(measureVerticalAdvance(verticalMetrics, "He"), 880 + 880)
+})
+
+test("measureVerticalAdvance falls back to defaultVertAdvance for an unmapped glyph", () => {
+  assert.strictEqual(measureVerticalAdvance(verticalMetrics, "Z"), 1000)
+})
+
+test("measureVerticalAdvance treats zero-width format characters as zero height, same as horizontal", () => {
+  const text = `H${String.fromCodePoint(0x200d)}e`
+  assert.strictEqual(measureVerticalAdvance(verticalMetrics, text), 880 + 0 + 880)
+})
+
+test("astral code points count as one glyph in vertical measurement too", () => {
+  const withEmoji = createFontMetrics({
+    unitsPerEm: 1000,
+    ascent: 800,
+    descent: -200,
+    defaultAdvance: 600,
+    advances: [],
+    defaultVertAdvance: 1000,
+    vertAdvances: [[0x1f600, 1000]],
+  })
+  assert.strictEqual(measureVerticalAdvance(withEmoji, String.fromCodePoint(0x1f600)), 1000)
+})
+
+test("measureHeight scales vertical advance by font size over unitsPerEm", () => {
+  const fontSize = 16
+  const expected = (measureVerticalAdvance(verticalMetrics, "He") / verticalMetrics.unitsPerEm) * fontSize
+  assert.strictEqual(measureHeight(verticalMetrics, "He", fontSize), expected)
+})
+
+test("verticalLineWidth follows the vertAscent - vertDescent + vertLineGap convention", () => {
+  const fontSize = 16
+  const expected = ((500 - -500 + 100) / verticalMetrics.unitsPerEm) * fontSize
+  assert.strictEqual(verticalLineWidth(verticalMetrics, fontSize), expected)
 })

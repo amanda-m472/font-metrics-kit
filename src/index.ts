@@ -13,6 +13,13 @@ export interface FontMetrics {
   readonly defaultAdvance: number
   readonly advances: ReadonlyMap<number, number>
   readonly kerning: ReadonlyMap<string, number>
+  /** vhea-style ascent, descent, and lineGap: the spacing between adjacent vertical lines. */
+  readonly vertAscent: number
+  readonly vertDescent: number
+  readonly vertLineGap: number
+  /** Advance used for any code point with no entry in `vertAdvances`. */
+  readonly defaultVertAdvance: number
+  readonly vertAdvances: ReadonlyMap<number, number>
 }
 
 export interface FontMetricsInit {
@@ -24,6 +31,18 @@ export interface FontMetricsInit {
   advances: Iterable<readonly [number, number]>
   /** [leftCodePoint, rightCodePoint, adjustment] triples, adjustment in design units. */
   kerningPairs?: Iterable<readonly [number, number, number]>
+  /**
+   * Vertical writing mode metrics, for glyphs that advance top-to-bottom
+   * instead of left-to-right. A font without a vhea/vmtx table (or an
+   * AFM file, which has no vertical metrics at all) simply omits these —
+   * callers who never measure vertical text never need to supply them.
+   */
+  vertAscent?: number
+  vertDescent?: number
+  vertLineGap?: number
+  /** Defaults to unitsPerEm, the conventional full-em advance for glyphs with no vmtx entry. */
+  defaultVertAdvance?: number
+  vertAdvances?: Iterable<readonly [number, number]>
 }
 
 export function createFontMetrics(init: FontMetricsInit): FontMetrics {
@@ -39,6 +58,13 @@ export function createFontMetrics(init: FontMetricsInit): FontMetrics {
     defaultAdvance: init.defaultAdvance,
     advances: new Map(init.advances),
     kerning,
+    // A font with no vertical-specific metrics still has a usable vertical
+    // line spacing by reusing its horizontal ascent/descent/lineGap.
+    vertAscent: init.vertAscent ?? init.ascent,
+    vertDescent: init.vertDescent ?? init.descent,
+    vertLineGap: init.vertLineGap ?? init.lineGap ?? 0,
+    defaultVertAdvance: init.defaultVertAdvance ?? init.unitsPerEm,
+    vertAdvances: new Map(init.vertAdvances ?? []),
   }
 }
 
@@ -95,6 +121,28 @@ export function measureAdvance(metrics: FontMetrics, text: string): number {
   return total
 }
 
+export function glyphVerticalAdvance(metrics: FontMetrics, codePoint: number): number {
+  const known = metrics.vertAdvances.get(codePoint)
+  if (known !== undefined) return known
+  if (isDefaultZeroWidth(codePoint)) return 0
+  return metrics.defaultVertAdvance
+}
+
+/**
+ * Total advance of `text` in the font's own design units, for vertical
+ * writing mode (glyphs stacked top-to-bottom). There is no vertical
+ * counterpart to kerning here — vertical kerning ('vkrn') is rare enough
+ * in practice that it is out of scope, same as GPOS kerning is for
+ * `measureAdvance`.
+ */
+export function measureVerticalAdvance(metrics: FontMetrics, text: string): number {
+  let total = 0
+  for (const codePoint of codePoints(text)) {
+    total += glyphVerticalAdvance(metrics, codePoint)
+  }
+  return total
+}
+
 export function unitsToPixels(metrics: FontMetrics, units: number, fontSize: number): number {
   return (units / metrics.unitsPerEm) * fontSize
 }
@@ -104,7 +152,17 @@ export function measureWidth(metrics: FontMetrics, text: string, fontSize: numbe
   return unitsToPixels(metrics, measureAdvance(metrics, text), fontSize)
 }
 
+/** Rendered height of `text` set in vertical writing mode, in pixels at `fontSize`. */
+export function measureHeight(metrics: FontMetrics, text: string, fontSize: number): number {
+  return unitsToPixels(metrics, measureVerticalAdvance(metrics, text), fontSize)
+}
+
 /** Single-line height in pixels, following the ascent - descent + lineGap convention. */
 export function lineHeight(metrics: FontMetrics, fontSize: number): number {
   return unitsToPixels(metrics, metrics.ascent - metrics.descent + metrics.lineGap, fontSize)
+}
+
+/** Spacing between adjacent vertical lines in pixels, the vertical-writing-mode counterpart to lineHeight. */
+export function verticalLineWidth(metrics: FontMetrics, fontSize: number): number {
+  return unitsToPixels(metrics, metrics.vertAscent - metrics.vertDescent + metrics.vertLineGap, fontSize)
 }
