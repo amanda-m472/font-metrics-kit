@@ -1,9 +1,10 @@
 /**
  * Reads the tables a TrueType/OpenType font ('sfnt') actually needs for
  * measurement — head, hhea, maxp, hmtx, cmap, and (if present) the legacy
- * 'kern' table — and turns them into a FontMetrics. This does not touch
- * glyph outlines, so it works the same for TTF (glyf) and OTF (CFF) files;
- * both store their metrics the same way.
+ * 'kern' table plus the vertical writing mode 'vhea'/'vmtx' tables — and
+ * turns them into a FontMetrics. This does not touch glyph outlines, so it
+ * works the same for TTF (glyf) and OTF (CFF) files; both store their
+ * metrics the same way.
  *
  * What's deliberately out of scope: font collections (.ttc/.otc), and
  * GPOS-based kerning. Most kerning in modern fonts lives in GPOS pair
@@ -87,6 +88,8 @@ export function parseSfntMetrics(buffer: ArrayBuffer | Uint8Array, options: Pars
   const kern = tables.get("kern")
   const kerningPairs = kern ? parseKern(reader, kern.offset, reverseCmap(codePointToGlyph)) : []
 
+  const vertical = parseVerticalMetrics(reader, tables, codePointToGlyph, numGlyphs)
+
   return createFontMetrics({
     unitsPerEm,
     ascent,
@@ -95,7 +98,57 @@ export function parseSfntMetrics(buffer: ArrayBuffer | Uint8Array, options: Pars
     defaultAdvance: options.defaultAdvance ?? glyphAdvances[0] ?? 0,
     advances,
     kerningPairs,
+    vertAscent: vertical?.vertAscent,
+    vertDescent: vertical?.vertDescent,
+    vertLineGap: vertical?.vertLineGap,
+    defaultVertAdvance: vertical?.defaultVertAdvance,
+    vertAdvances: vertical?.vertAdvances,
   })
+}
+
+interface VerticalMetrics {
+  readonly vertAscent: number
+  readonly vertDescent: number
+  readonly vertLineGap: number
+  readonly defaultVertAdvance: number
+  readonly vertAdvances: Map<number, number>
+}
+
+/**
+ * vhea/vmtx mirror hhea/hmtx field-for-field, just for top-to-bottom advance
+ * instead of left-to-right — same header layout, same tail-fill scheme for
+ * glyphs past the last explicit metric. Both tables are optional: plenty of
+ * fonts (most Latin text faces) ship with no vertical metrics at all.
+ */
+function parseVerticalMetrics(
+  reader: Reader,
+  tables: Map<string, TableRecord>,
+  codePointToGlyph: Map<number, number>,
+  numGlyphs: number,
+): VerticalMetrics | undefined {
+  const vhea = tables.get("vhea")
+  const vmtx = tables.get("vmtx")
+  if (!vhea || !vmtx) return undefined
+
+  const vertAscent = reader.i16(vhea.offset + 4)
+  const vertDescent = reader.i16(vhea.offset + 6)
+  const vertLineGap = reader.i16(vhea.offset + 8)
+  const numOfLongVerMetrics = reader.u16(vhea.offset + 34)
+
+  const glyphVertAdvances = parseHmtx(reader, vmtx.offset, numOfLongVerMetrics, numGlyphs)
+  const vertAdvances = new Map<number, number>()
+  for (const [codePoint, glyphId] of codePointToGlyph) {
+    const advance = glyphVertAdvances[glyphId]
+    if (advance !== undefined) vertAdvances.set(codePoint, advance)
+  }
+
+  return {
+    vertAscent,
+    vertDescent,
+    vertLineGap,
+    defaultVertAdvance: glyphVertAdvances[0] ?? 0,
+    vertAdvances,
+  }
 }
 
 function readTableDirectory(reader: Reader): Map<string, TableRecord> {

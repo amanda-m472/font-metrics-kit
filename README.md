@@ -92,8 +92,9 @@ to be out of scope here, same as GPOS kerning is for horizontal measurement.
 ### Loading metrics from a font file
 
 `parseSfntMetrics` reads the `head`, `hhea`, `maxp`, `hmtx`, `cmap`, and (if
-present) legacy `kern` tables straight out of a TTF or OTF binary, so you
-don't have to build a `FontMetricsInit` by hand:
+present) legacy `kern` and vertical writing mode `vhea`/`vmtx` tables
+straight out of a TTF or OTF binary, so you don't have to build a
+`FontMetricsInit` by hand:
 
 ```ts
 import { parseSfntMetrics } from "font-metrics-kit/sfnt"
@@ -107,7 +108,9 @@ measureWidth(metrics, "Hello", 16)
 Font collections (`.ttc`/`.otc`) aren't supported — pass the bytes of a
 single font. Kerning is read from the legacy `kern` table only; fonts that
 kern exclusively through GPOS pair adjustment (most modern ones) will
-measure without kerning.
+measure without kerning. A font with no `vhea`/`vmtx` tables simply falls
+back to the horizontal metrics for vertical writing mode, the same way a
+hand-built `FontMetricsInit` does when it omits `vertAscent` and friends.
 
 ### Word wrap
 
@@ -129,11 +132,9 @@ to put it. `\n`, `\r\n`, and `\r` are all treated as explicit line breaks.
 ## Status
 
 Advance widths, kerning pairs, line-height metrics, vertical writing mode,
-parsing real hmtx/hhea/cmap/kern tables out of TTF/OTF binaries, and greedy
-word-wrap all work. Vertical metrics are supplied by the caller, the same
-way horizontal ones are — `parseSfntMetrics` does not read `vhea`/`vmtx`
-yet. There is no AFM support yet either — see the roadmap in the repo for
-what's planned next.
+parsing real hmtx/hhea/cmap/kern/vhea/vmtx tables out of TTF/OTF binaries,
+and greedy word-wrap all work. There is no AFM support yet — see the
+roadmap in the repo for what's planned next.
 
 ## License
 

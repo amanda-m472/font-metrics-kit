@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { parseSfntMetrics } from "../src/sfnt.js"
-import { measureAdvance } from "../src/index.js"
+import { measureAdvance, measureVerticalAdvance, verticalLineWidth } from "../src/index.js"
 
 // Hand-built sfnt (TrueType/OpenType) binaries, byte for byte, so these
 // tests don't depend on shipping a real font file. Only the fields the
@@ -115,6 +115,17 @@ function buildCmap(subtables: ReadonlyArray<{ platformID: number; encodingID: nu
   return [...u16be(0), ...u16be(subtables.length), ...records, ...bodies]
 }
 
+// vhea has the same layout as hhea, just describing top-to-bottom advances.
+function buildVhea(vertAscent: number, vertDescent: number, vertLineGap: number, numOfLongVerMetrics: number): number[] {
+  return buildHhea(vertAscent, vertDescent, vertLineGap, numOfLongVerMetrics)
+}
+
+// vmtx has the same layout as hmtx: (advanceHeight, topSideBearing) pairs,
+// then tail entries that reuse the last advance.
+function buildVmtx(advances: number[], numGlyphs: number): number[] {
+  return buildHmtx(advances, numGlyphs)
+}
+
 function buildKern(pairs: ReadonlyArray<{ leftGlyph: number; rightGlyph: number; value: number }>): number[] {
   const body = pairs.flatMap((p) => [...u16be(p.leftGlyph), ...u16be(p.rightGlyph), ...u16be(p.value)])
   const subtable = [
@@ -197,6 +208,50 @@ test("kern table pairs are resolved from glyph IDs back to code points", () => {
   const metrics = parseSfntMetrics(fullFeaturedFont())
   assert.strictEqual(measureAdvance(metrics, "AV"), 667 + 667 - 80)
   assert.strictEqual(measureAdvance(metrics, "A"), 667)
+})
+
+test("parses vertAscent, vertDescent, vertLineGap, and per-glyph vertical advances from vhea/vmtx", () => {
+  const font = buildFont({
+    head: buildHead(1000),
+    hhea: buildHhea(800, -200, 90, 6),
+    maxp: buildMaxp(7),
+    hmtx: buildHmtx([600, 722, 556, 667, 667, 1000], 7),
+    cmap: buildCmap([{ platformID: 3, encodingID: 10, bytes: buildCmapFormat12(CMAP_ENTRIES) }]),
+    vhea: buildVhea(880, -120, 0, 6),
+    vmtx: buildVmtx([1000, 900, 800, 700, 700, 850], 7),
+  })
+
+  const metrics = parseSfntMetrics(font)
+  assert.strictEqual(metrics.vertAscent, 880)
+  assert.strictEqual(metrics.vertDescent, -120)
+  assert.strictEqual(metrics.vertLineGap, 0)
+  assert.strictEqual(measureVerticalAdvance(metrics, "H"), 900)
+  assert.strictEqual(measureVerticalAdvance(metrics, String.fromCodePoint(CODE_EMOJI)), 850)
+  // glyph 6 ('Z') has no vmtx entry of its own; vmtx tail-fill reuses glyph 5's vertical advance.
+  assert.strictEqual(measureVerticalAdvance(metrics, "Z"), 850)
+  assert.strictEqual(metrics.defaultVertAdvance, 1000)
+})
+
+test("a font with no vhea/vmtx tables falls back to horizontal metrics for vertical writing mode", () => {
+  const metrics = parseSfntMetrics(fullFeaturedFont())
+  assert.strictEqual(metrics.vertAscent, metrics.ascent)
+  assert.strictEqual(metrics.vertDescent, metrics.descent)
+  assert.strictEqual(metrics.vertLineGap, metrics.lineGap)
+  assert.strictEqual(metrics.defaultVertAdvance, metrics.unitsPerEm)
+  assert.strictEqual(verticalLineWidth(metrics, 16), (metrics.ascent - metrics.descent + metrics.lineGap) / metrics.unitsPerEm * 16)
+})
+
+test("a font with vhea but no vmtx (or vice versa) falls back to horizontal metrics", () => {
+  const withOnlyVhea = buildFont({
+    head: buildHead(1000),
+    hhea: buildHhea(800, -200, 90, 6),
+    maxp: buildMaxp(7),
+    hmtx: buildHmtx([600, 722, 556, 667, 667, 1000], 7),
+    cmap: buildCmap([{ platformID: 3, encodingID: 10, bytes: buildCmapFormat12(CMAP_ENTRIES) }]),
+    vhea: buildVhea(880, -120, 0, 6),
+  })
+  const metrics = parseSfntMetrics(withOnlyVhea)
+  assert.strictEqual(metrics.vertAscent, metrics.ascent)
 })
 
 test("format 4 cmap works standalone and leaves unmapped astral code points as tofu", () => {
