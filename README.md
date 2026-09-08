@@ -112,6 +112,34 @@ measure without kerning. A font with no `vhea`/`vmtx` tables simply falls
 back to the horizontal metrics for vertical writing mode, the same way a
 hand-built `FontMetricsInit` does when it omits `vertAscent` and friends.
 
+### Loading metrics from an AFM file
+
+`parseAfmMetrics` reads a PostScript Type 1 font's Adobe Font Metrics
+(`.afm`) file — the format the original 14 PostScript fonts (Helvetica,
+Times, Courier, and their bold/italic variants) ship as, since they have no
+`hmtx`/`cmap` tables to parse. AFM has no cmap either: characters and
+kerning pairs are keyed by glyph name (`"aacute"`, `"quoteright"`), so
+`parseAfmMetrics` maps names to Unicode code points using the
+StandardEncoding/WinAnsiEncoding repertoire those fonts use, plus the
+`uniXXXX` naming convention for anything else. A glyph name it doesn't
+recognize is dropped rather than guessed at.
+
+```ts
+import { parseAfmMetrics } from "font-metrics-kit/afm"
+import { readFile } from "node:fs/promises"
+
+const afm = await readFile("./Helvetica.afm", "utf8")
+const metrics = parseAfmMetrics(afm)
+measureWidth(metrics, "Hello", 16)
+```
+
+AFM has no explicit `unitsPerEm` field — Type 1 fonts always use a
+1000-unit em, so `parseAfmMetrics` assumes that. Ascent and descent come
+from the `Ascender`/`Descender` keys, falling back to the font's `FontBBox`
+if those are absent. Symbol and ZapfDingbats AFMs aren't supported: their
+glyph names (`"alpha"`, `"a100"`, ...) don't map to a single Unicode code
+point the way Latin text glyph names do.
+
 ### Word wrap
 
 `wrapText` breaks a string into lines that fit a pixel width, using
@@ -133,8 +161,7 @@ to put it. `\n`, `\r\n`, and `\r` are all treated as explicit line breaks.
 
 Advance widths, kerning pairs, line-height metrics, vertical writing mode,
 parsing real hmtx/hhea/cmap/kern/vhea/vmtx tables out of TTF/OTF binaries,
-and greedy word-wrap all work. There is no AFM support yet — see the
-roadmap in the repo for what's planned next.
+parsing AFM files for PostScript fonts, and greedy word-wrap all work.
 
 ## License
 

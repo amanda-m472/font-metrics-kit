@@ -14,6 +14,10 @@
       "types": "./dist/src/sfnt.d.ts",
       "default": "./dist/src/sfnt.js"
     },
+    "./afm": {
+      "types": "./dist/src/afm.d.ts",
+      "default": "./dist/src/afm.js"
+    },
     "./wrap": {
       "types": "./dist/src/wrap.d.ts",
       "default": "./dist/src/wrap.js"
