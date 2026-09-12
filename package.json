@@ -2,7 +2,24 @@
   "name": "font-metrics-kit",
   "version": "0.1.0",
   "description": "Measure text using real font metrics tables instead of string length.",
+  "keywords": [
+    "font",
+    "font-metrics",
+    "text-measurement",
+    "typography",
+    "kerning",
+    "word-wrap",
+    "sfnt",
+    "afm",
+    "hmtx"
+  ],
+  "author": "amanda-m472",
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "exports": {
@@ -28,9 +45,9 @@
   ],
   "scripts": {
     "build": "tsc -p .",
-    "test": "tsc -p . && node --test dist/test"
+    "test": "tsc -p . && node --test dist/test",
+    "prepublishOnly": "npm test"
   },
-  "license": "MIT",
   "devDependencies": {
     "typescript": "^5.5.0"
   }
