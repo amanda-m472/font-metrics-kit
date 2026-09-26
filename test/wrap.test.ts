@@ -68,3 +68,19 @@ test("reported width matches measureWidth of the trimmed line text", () => {
   assert.strictEqual(lines[0]?.width, 25) // "hello"
   assert.strictEqual(lines[1]?.width, 25) // "world"
 })
+
+test("a non-breaking space is not a break point, unlike a regular space", () => {
+  // "ab cd" has a real break point, so it wraps cleanly at the space.
+  assert.deepEqual(lineTexts(metrics, "ab cd", 10, 10), ["ab", "cd"])
+  // "ab cd" has no break point at all, so it force-breaks by code point instead.
+  assert.deepEqual(lineTexts(metrics, "ab cd", 10, 10), ["ab", " c", "d"])
+})
+
+test("a non-breaking space still measures as whitespace width, just without a break opportunity", () => {
+  const lines = wrapText(metrics, "a b cd", 10, 20)
+  assert.deepEqual(
+    lines.map((l) => l.text),
+    ["a b", "cd"],
+  )
+  assert.strictEqual(lines[0]?.width, 15) // "a" + NBSP + "b", 3 * 5px
+})

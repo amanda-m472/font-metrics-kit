@@ -3,6 +3,10 @@
  * \r\n, or \r) into lines no wider than maxWidth, breaking at whitespace
  * runs. A single word wider than maxWidth on its own is force-broken at
  * code point boundaries, since there is no better place to put it.
+ *
+ * Non-breaking spaces (U+00A0, U+2007, U+202F) are not break points, even
+ * though they're whitespace for width purposes — the same distinction a
+ * real line-breaking implementation makes.
  */
 import { measureWidth, type FontMetrics } from "./index.js"
 
@@ -58,13 +62,22 @@ function wrapParagraph(metrics: FontMetrics, paragraph: string, fontSize: number
   return lines
 }
 
+// Unicode treats these Zs-category spaces as non-breaking ("glue" in the
+// line-breaking algorithm) even though JavaScript's \s regex matches them:
+// a no-break space is supposed to keep its neighbors on the same line.
+const NON_BREAKING_WHITESPACE = new Set([0x00a0, 0x2007, 0x202f])
+
+function isBreakOpportunity(character: string): boolean {
+  return /\s/.test(character) && !NON_BREAKING_WHITESPACE.has(character.codePointAt(0) as number)
+}
+
 /** Splits into alternating runs of whitespace and non-whitespace, by code point. */
 function tokenize(text: string): Token[] {
   const tokens: Token[] = []
   let current = ""
   let currentIsSpace: boolean | undefined
   for (const character of text) {
-    const isSpace = /\s/.test(character)
+    const isSpace = isBreakOpportunity(character)
     if (currentIsSpace === undefined || isSpace === currentIsSpace) {
       current += character
     } else {
